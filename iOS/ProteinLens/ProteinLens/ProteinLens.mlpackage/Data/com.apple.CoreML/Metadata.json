@@ -1,0 +1,13 @@
+{
+  "MLModelVersionStringKey" : "1.0",
+  "MLModelDescriptionKey" : "ProteinLens India — Food classifier 86% accuracy",
+  "MLModelCreatorDefinedKey" : {
+    "num_classes" : "20",
+    "model_version" : "1.0",
+    "com.github.apple.coremltools.source" : "tensorflow==2.16.2",
+    "com.github.apple.coremltools.version" : "7.2",
+    "nutrition_data" : "{\"0\": {\"display\": \"Chicken Curry\", \"food_id\": \"chicken_curry\", \"protein_g\": 25.0, \"calories\": 150}, \"1\": {\"display\": \"Samosa\", \"food_id\": \"samosa\", \"protein_g\": 6.0, \"calories\": 262}, \"2\": {\"display\": \"Omelette\", \"food_id\": \"omelette\", \"protein_g\": 10.9, \"calories\": 154}, \"3\": {\"display\": \"Egg\", \"food_id\": \"eggs_benedict\", \"protein_g\": 12.6, \"calories\": 155}, \"4\": {\"display\": \"French Toast\", \"food_id\": \"french_toast\", \"protein_g\": 8.5, \"calories\": 229}, \"5\": {\"display\": \"Fried Rice\", \"food_id\": \"fried_rice\", \"protein_g\": 4.4, \"calories\": 163}, \"6\": {\"display\": \"Momos\", \"food_id\": \"dumplings\", \"protein_g\": 7.0, \"calories\": 180}, \"7\": {\"display\": \"Spring Rolls\", \"food_id\": \"spring_rolls\", \"protein_g\": 4.0, \"calories\": 153}, \"8\": {\"display\": \"Hot & Sour Soup\", \"food_id\": \"hot_and_sour_soup\", \"protein_g\": 3.8, \"calories\": 71}, \"9\": {\"display\": \"Noodles\", \"food_id\": \"pad_thai\", \"protein_g\": 10.0, \"calories\": 181}, \"10\": {\"display\": \"Chicken\", \"food_id\": \"chicken_wings\", \"protein_g\": 27.0, \"calories\": 203}, \"11\": {\"display\": \"Sandwich\", \"food_id\": \"club_sandwich\", \"protein_g\": 18.0, \"calories\": 290}, \"12\": {\"display\": \"Burger\", \"food_id\": \"hamburger\", \"protein_g\": 20.3, \"calories\": 295}, \"13\": {\"display\": \"Pizza\", \"food_id\": \"pizza\", \"protein_g\": 11.0, \"calories\": 266}, \"14\": {\"display\": \"Fish\", \"food_id\": \"grilled_salmon\", \"protein_g\": 25.4, \"calories\": 208}, \"15\": {\"display\": \"Hummus\", \"food_id\": \"hummus\", \"protein_g\": 7.9, \"calories\": 177}, \"16\": {\"display\": \"Falafel\", \"food_id\": \"falafel\", \"protein_g\": 13.3, \"calories\": 333}, \"17\": {\"display\": \"Pancakes\", \"food_id\": \"pancakes\", \"protein_g\": 5.7, \"calories\": 227}, \"18\": {\"display\": \"Rice Bowl\", \"food_id\": \"bibimbap\", \"protein_g\": 12.0, \"calories\": 190}, \"19\": {\"display\": \"Steak\", \"food_id\": \"steak\", \"protein_g\": 26.1, \"calories\": 271}}"
+  },
+  "MLModelAuthorKey" : "Aditya Bhatt",
+  "MLModelLicenseKey" : "MIT"
+}
