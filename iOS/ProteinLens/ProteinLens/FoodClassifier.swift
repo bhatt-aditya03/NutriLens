@@ -1,7 +1,6 @@
 // FoodClassifier.swift
-// ProteinLens — Day 4 (Fixed)
-// AVFoundation + Vision + CoreML
-// Fix: hardcoded nutrition lookup + debug logging
+// ProteinLens — Day 5
+// Added: pauseInference() / resumeInference() for freeze frame
 
 import AVFoundation
 import Vision
@@ -17,8 +16,7 @@ struct NutritionInfo {
     let carbs_g   : Float
 }
 
-// ── Hardcoded nutrition lookup ────────────────────────────────
-// Keyed by CoreML classLabel output strings
+// ── Hardcoded nutrition lookup (per 100g, USDA) ───────────────
 private let nutritionDB: [String: NutritionInfo] = [
     "Chicken Curry"  : NutritionInfo(protein_g: 25.0, calories: 150, fat_g: 7.0,  carbs_g: 5.0),
     "Samosa"         : NutritionInfo(protein_g: 6.0,  calories: 262, fat_g: 15.0, carbs_g: 27.0),
@@ -54,26 +52,42 @@ final class FoodClassifier: NSObject, ObservableObject {
     private let sessionQueue = DispatchQueue(label: "cam.session", qos: .userInitiated)
     private let inferQueue   = DispatchQueue(label: "cam.infer",   qos: .userInitiated)
 
-    private var visionRequest: VNCoreMLRequest?
-    private var frameCounter  = 0
-    private let skipFrames    = 10   // run inference every 10 frames
+    private var visionRequest  : VNCoreMLRequest?
+    private var frameCounter   = 0
+    private let skipFrames     = 10
+    private let threshold      : Float = 0.40
 
-    // Minimum confidence to show result
-    private let threshold: Float = 0.40
+    // Freeze frame flag
+    private var inferenceActive = true
 
     override init() {
         super.init()
         setupModel()
     }
 
+    // ── Freeze / unfreeze ─────────────────────────────────────
+    func pauseInference() {
+        inferenceActive = false
+        print("⏸ Inference paused — frame frozen")
+    }
+
+    func resumeInference() {
+        inferenceActive = true
+        // Clear previous result so scanner restarts fresh
+        DispatchQueue.main.async { [weak self] in
+            self?.label      = ""
+            self?.confidence = 0
+            self?.nutrition  = nil
+        }
+        print("▶️ Inference resumed")
+    }
+
     // ── CoreML + Vision setup ─────────────────────────────────
     private func setupModel() {
         do {
-            // Use auto-generated class — no bundle lookup needed
             let config          = MLModelConfiguration()
             config.computeUnits = .cpuAndNeuralEngine
 
-            // Xcode auto-generates ProteinLens class from .mlpackage
             let mlModel = try ProteinLens(configuration: config).model
             let vnModel = try VNCoreMLModel(for: mlModel)
 
@@ -81,14 +95,14 @@ final class FoodClassifier: NSObject, ObservableObject {
                 self?.handleResults(req, err)
             }
             visionRequest?.imageCropAndScaleOption = .centerCrop
-            print("✅ CoreML model loaded via generated class")
+            print("✅ CoreML model loaded")
 
         } catch {
             print("❌ CoreML setup error: \(error)")
         }
     }
 
-    // ── Session start/stop ────────────────────────────────────
+    // ── Session ───────────────────────────────────────────────
     func startSession() {
         sessionQueue.async { [weak self] in
             self?.configureSession()
@@ -107,7 +121,6 @@ final class FoodClassifier: NSObject, ObservableObject {
         session.beginConfiguration()
         session.sessionPreset = .hd1280x720
 
-        // Back camera
         guard
             let device = AVCaptureDevice.default(
                 .builtInWideAngleCamera, for: .video, position: .back),
@@ -119,9 +132,7 @@ final class FoodClassifier: NSObject, ObservableObject {
             return
         }
         session.addInput(input)
-        print("✅ Camera input added")
 
-        // Frame output
         videoOutput.setSampleBufferDelegate(self, queue: inferQueue)
         videoOutput.alwaysDiscardsLateVideoFrames = true
         videoOutput.videoSettings = [
@@ -134,9 +145,7 @@ final class FoodClassifier: NSObject, ObservableObject {
             return
         }
         session.addOutput(videoOutput)
-        print("✅ Video output added")
 
-        // Portrait orientation
         if let conn = videoOutput.connection(with: .video) {
             if conn.isVideoRotationAngleSupported(90) {
                 conn.videoRotationAngle = 90
@@ -144,31 +153,23 @@ final class FoodClassifier: NSObject, ObservableObject {
         }
 
         session.commitConfiguration()
+        print("✅ Camera configured")
     }
 
     // ── Handle Vision results ─────────────────────────────────
     private func handleResults(_ request: VNRequest, _ error: Error?) {
-        if let error {
-            print("❌ Vision error: \(error)")
-            return
-        }
+        if let error { print("❌ Vision error: \(error)"); return }
 
         guard
-            let results   = request.results as? [VNClassificationObservation],
-            let top       = results.first
-        else {
-            print("⚠️ No classification results")
-            return
+            let results = request.results as? [VNClassificationObservation],
+            let top     = results.first
+        else { return }
+
+        // Log top 3
+        results.prefix(3).forEach {
+            print("🔍 \($0.identifier): \(Int($0.confidence * 100))%")
         }
 
-        // Always log top 3 so we can debug
-        let top3 = results.prefix(3)
-        print("🔍 Top results:")
-        for r in top3 {
-            print("   \(r.identifier) → \(Int(r.confidence * 100))%")
-        }
-
-        // Only show if above threshold
         guard top.confidence >= threshold else {
             DispatchQueue.main.async { [weak self] in
                 self?.label      = ""
@@ -178,24 +179,17 @@ final class FoodClassifier: NSObject, ObservableObject {
             return
         }
 
-        let detectedLabel = top.identifier
-        let detectedConf  = top.confidence
-        let detectedNutr  = nutritionDB[detectedLabel]
-
-        if detectedNutr == nil {
-            print("⚠️ No nutrition data for: '\(detectedLabel)'")
-            print("   Available keys: \(Array(nutritionDB.keys))")
-        }
+        let detectedNutrition = nutritionDB[top.identifier]
 
         DispatchQueue.main.async { [weak self] in
-            self?.label      = detectedLabel
-            self?.confidence = detectedConf
-            self?.nutrition  = detectedNutr
+            self?.label      = top.identifier
+            self?.confidence = top.confidence
+            self?.nutrition  = detectedNutrition
         }
     }
 }
 
-// ── Sample buffer delegate ────────────────────────────────────
+// ── AVCaptureVideoDataOutputSampleBufferDelegate ──────────────
 extension FoodClassifier: AVCaptureVideoDataOutputSampleBufferDelegate {
 
     func captureOutput(
@@ -203,6 +197,9 @@ extension FoodClassifier: AVCaptureVideoDataOutputSampleBufferDelegate {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        // Skip if frozen
+        guard inferenceActive else { return }
+
         frameCounter += 1
         guard frameCounter % skipFrames == 0 else { return }
 
