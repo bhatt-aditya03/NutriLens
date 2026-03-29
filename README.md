@@ -16,8 +16,7 @@
 
 ## Demo
 
-<!-- Add demo.gif here after recording -->
-> 📱 Point camera → food detected → nutrition shown instantly, fully offline
+![ProteinLens Demo](assets/ProteinLens.gif)
 
 ---
 
