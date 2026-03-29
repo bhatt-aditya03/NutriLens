@@ -205,5 +205,4 @@ python verify_mlpackage.py
 
 ## Author
 
-**Aditya Bhatt** — B.Tech CSE (Data Science), PSIT Kanpur  
-[github.com/bhatt-aditya03](https://github.com/bhatt-aditya03) · [linkedin.com/in/bhatt-aditya03](https://linkedin.com/in/bhatt-aditya03)
+**Aditya Bhatt** 
