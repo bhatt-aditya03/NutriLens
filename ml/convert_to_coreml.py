@@ -1,6 +1,13 @@
 """
-ProteinLens — Day 3: Keras -> CoreML Conversion
-Fix: Export to SavedModel first, then convert to CoreML
+ProteinLens v2 — CoreML Conversion
+====================================
+Converts ProteinLens_v2.keras -> ProteinLens_v2.mlpackage
+30 Indian food classes, 86.4% accuracy
+
+Run:
+    conda activate coreml_env
+    cd ~/ProteinLens/ml
+    python convert_to_coreml_v2.py
 """
 
 import json, os, shutil
@@ -9,23 +16,21 @@ import tensorflow as tf
 import coremltools as ct
 from PIL import Image
 
-KERAS_MODEL_PATH = 'ProteinLens_model.keras'
-SAVED_MODEL_PATH = 'ProteinLens_savedmodel'
-COREML_OUTPUT    = 'ProteinLens.mlpackage'
-LABEL_MAP_PATH   = 'label_map.json'
+KERAS_MODEL_PATH = 'ProteinLens_v2.keras'
+SAVED_MODEL_PATH = 'ProteinLens_v2_savedmodel'
+COREML_OUTPUT    = 'ProteinLens_v2.mlpackage'
+LABEL_MAP_PATH   = 'label_map_v2.json'
 
 # ── Load label map ────────────────────────────────────────────
 print('Loading label map...')
 with open(LABEL_MAP_PATH) as f:
     label_map = json.load(f)
 
-class_labels  = label_map['idx_to_display']
-num_classes   = len(class_labels)
-display_names = [class_labels[str(i)] for i in range(num_classes)]
-protein_data  = label_map['idx_to_protein']
+num_classes   = len(label_map['target_classes'])
+display_names = [label_map['idx_to_display'][str(i)] for i in range(num_classes)]
 
-print(f'Classes      : {num_classes}')
-print(f'Labels       : {display_names}')
+print(f'Classes : {num_classes}')
+print(f'Labels  : {display_names}')
 
 # ── Load Keras model ──────────────────────────────────────────
 print(f'\nLoading {KERAS_MODEL_PATH}...')
@@ -39,12 +44,10 @@ print(f'Probs sum    : {pred.sum():.4f}')
 print(f'Top class    : {display_names[np.argmax(pred)]}')
 
 # ── Step 1: Export to SavedModel ──────────────────────────────
-# This is the key fix — coremltools works with SavedModel, not .keras
-print(f'\nStep 1: Exporting to SavedModel...')
+print(f'\nExporting to SavedModel...')
 if os.path.exists(SAVED_MODEL_PATH):
     shutil.rmtree(SAVED_MODEL_PATH)
 
-# Build concrete function with fixed input shape
 @tf.function(input_signature=[
     tf.TensorSpec(shape=(1, 224, 224, 3), dtype=tf.float32, name='image')
 ])
@@ -56,10 +59,10 @@ tf.saved_model.save(
     SAVED_MODEL_PATH,
     signatures={'serving_default': serving_fn}
 )
-print(f'SavedModel saved to: {SAVED_MODEL_PATH}')
+print(f'SavedModel saved: {SAVED_MODEL_PATH}')
 
-# ── Step 2: Convert SavedModel to CoreML ──────────────────────
-print(f'\nStep 2: Converting SavedModel to CoreML...')
+# ── Step 2: Convert to CoreML ─────────────────────────────────
+print(f'\nConverting to CoreML...')
 
 image_input = ct.ImageType(
     name='image',
@@ -81,36 +84,29 @@ coreml_model = ct.convert(
 
 # ── Add metadata ──────────────────────────────────────────────
 print('Adding metadata...')
-coreml_model.short_description = 'ProteinLens India — Food classifier 86% accuracy'
+coreml_model.short_description = 'ProteinLens v2 — Indian Food Classifier (86.4% accuracy, 30 classes)'
 coreml_model.author            = 'Aditya Bhatt'
 coreml_model.license           = 'MIT'
-coreml_model.version           = '1.0'
+coreml_model.version           = '2.0'
 
-nutrition_json = json.dumps({
-    str(i): {
-        'display' : display_names[i],
-        'food_id' : label_map['idx_to_class'][str(i)],
-        **protein_data[str(i)]
-    }
-    for i in range(num_classes)
-})
-coreml_model.user_defined_metadata['nutrition_data'] = nutrition_json
-coreml_model.user_defined_metadata['num_classes']    = str(num_classes)
-coreml_model.user_defined_metadata['model_version']  = '1.0'
+coreml_model.user_defined_metadata['num_classes']   = str(num_classes)
+coreml_model.user_defined_metadata['model_version'] = '2.0'
+coreml_model.user_defined_metadata['dataset']       = 'IndianFoodDB-30'
+coreml_model.user_defined_metadata['val_accuracy']  = '0.8643'
 
-# ── Save .mlpackage ───────────────────────────────────────────
+# ── Save ──────────────────────────────────────────────────────
 if os.path.exists(COREML_OUTPUT):
     shutil.rmtree(COREML_OUTPUT)
 
 print(f'\nSaving {COREML_OUTPUT}...')
 coreml_model.save(COREML_OUTPUT)
-print(f'Saved!')
+print('Saved!')
 
 # ── Verify ────────────────────────────────────────────────────
-print('\nVerifying CoreML model...')
+print('\nVerifying...')
 loaded = ct.models.MLModel(COREML_OUTPUT)
+spec   = loaded.get_spec()
 
-spec = loaded.get_spec()
 print('Inputs :')
 for inp in spec.description.input:
     print(f'  {inp.name}')
@@ -118,19 +114,17 @@ print('Outputs:')
 for out in spec.description.output:
     print(f'  {out.name}')
 
-# Test prediction
 test_img = Image.fromarray(
     np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
 )
 result = loaded.predict({'image': test_img})
 label  = result.get('classLabel', 'unknown')
-probs  = result.get('classLabelProbs', {})
+probs  = result.get('classLabel_probs', {})
 top3   = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:3]
-print(f'\nTest prediction:')
+print('\nTest prediction:')
 for lbl, prob in top3:
-    print(f'  {lbl:<20} {prob*100:.1f}%')
+    print(f'  {lbl:<25} {prob*100:.1f}%')
 
-# Model size
 total_size = sum(
     os.path.getsize(os.path.join(dp, f))
     for dp, dn, files in os.walk(COREML_OUTPUT)
@@ -138,13 +132,14 @@ total_size = sum(
 )
 print(f'\nModel size: {total_size/1024/1024:.1f} MB')
 
-# Cleanup SavedModel temp folder
 shutil.rmtree(SAVED_MODEL_PATH)
 print(f'Cleaned up {SAVED_MODEL_PATH}')
 
 print('\n' + '='*50)
-print('Day 3 COMPLETE')
+print('v2 CoreML Conversion COMPLETE')
 print('='*50)
-print(f'Output : {COREML_OUTPUT}')
-print('Next   : Drag ProteinLens.mlpackage into Xcode')
+print(f'Output  : {COREML_OUTPUT}')
+print(f'Classes : {num_classes}')
+print(f'Accuracy: 86.4%')
+print('Next    : Update iOS app with new model + 30 class nutrition DB')
 print('='*50)

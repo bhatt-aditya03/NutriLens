@@ -1,0 +1,14 @@
+{
+  "MLModelVersionStringKey" : "2.0",
+  "MLModelDescriptionKey" : "NutriLens v2 — Indian Food Classifier (86.4% accuracy, 30 classes)",
+  "MLModelCreatorDefinedKey" : {
+    "num_classes" : "30",
+    "val_accuracy" : "0.8643",
+    "model_version" : "2.0",
+    "com.github.apple.coremltools.source" : "tensorflow==2.16.2",
+    "dataset" : "IndianFoodDB-30",
+    "com.github.apple.coremltools.version" : "7.2"
+  },
+  "MLModelAuthorKey" : "Aditya Bhatt",
+  "MLModelLicenseKey" : "MIT"
+}

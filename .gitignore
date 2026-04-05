@@ -213,3 +213,9 @@ iOS/ProteinLens/ProteinLens.xcodeproj/project.xcworkspace/xcuserdata/
 iOS/ProteinLens/ProteinLens/ProteinLens.mlpackage/Data/com.apple.CoreML/weights/
 .DS_Store
 **/.DS_Store
+iOS/NutriLens/DerivedData/
+iOS/ProteinLens/
+ml/NutriLens_model.keras
+ml/ProteinLens_model.keras
+ml/NutriLens_v2.keras
+ml/ProteinLens_v2.keras
