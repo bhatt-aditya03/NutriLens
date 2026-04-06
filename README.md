@@ -18,7 +18,9 @@
 
 ## Demo
 
-![NutriLens Demo](assets/NutriLens.gif)
+<p align="center">
+  <img src="assets/NutriLens.gif" alt="NutriLens Demo" width="280"/>
+</p>
 
 ---
 
@@ -177,19 +179,17 @@ NutriLens/
 
 ## Training Curves
 
-![Training Curves](assets/training_curves.png)
+<p align="center">
+  <img src="assets/training_curves.png" alt="Training Curves" width="800"/>
+</p>
 
 ---
 
 ## Confusion Matrix
 
-![Confusion Matrix](assets/confusion_matrix.png)
-
----
-
-## Resume Headline
-
-> **NutriLens** — Built a real-time on-device food classification iOS app using a custom-trained MobileNetV2 CNN (86.4% accuracy) on IndianFoodDB-30, a self-curated dataset of 5,191 images across 30 Indian food classes. Deployed as a 5.9MB CoreML model running fully offline on iPhone using AVFoundation + Vision framework + SwiftUI.
+<p align="center">
+  <img src="assets/confusion_matrix.png" alt="Confusion Matrix" width="800"/>
+</p>
 
 ---
 
