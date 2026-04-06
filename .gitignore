@@ -20,3 +20,5 @@ iOS/NutriLens/NutriLens.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Jupyter
 .ipynb_checkpoints/
+ml/NutriLens_model.keras
+ml/NutriLens_v2.keras
