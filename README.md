@@ -6,14 +6,12 @@
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.19-FF6F00?logo=tensorflow&logoColor=white)
 ![CoreML](https://img.shields.io/badge/CoreML-on--device-black?logo=apple&logoColor=white)
 ![iOS](https://img.shields.io/badge/iOS-17%2B-lightgrey?logo=apple&logoColor=white)
-![Accuracy](https://img.shields.io/badge/Accuracy-86.4%25-brightgreen)
+![Val Accuracy](https://img.shields.io/badge/Val%20Accuracy-86.4%25-brightgreen)
 ![Classes](https://img.shields.io/badge/Classes-30-blue)
 ![Model](https://img.shields.io/badge/Model-5.9MB-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 Real-time on-device Indian food classification iOS app. Point your camera at food — get instant nutrition estimates. No internet required.
-
-**iOS App:** See `/iOS` — SwiftUI + CoreML, runs on iOS 17+
 
 > **Disclaimer:** Nutrition values are approximate per-100g averages sourced from IFCT 2017 and USDA FoodData Central. Values vary by recipe and preparation. Not intended for medical or clinical dietary use.
 
@@ -58,7 +56,8 @@ ScanHistoryStore — daily protein + calorie totals
 | Dataset | IndianFoodDB-30 (5,191 images, 30 classes) |
 | Training platform | Kaggle T4 x2 GPU |
 | Phase 1 val accuracy | 84.0% |
-| Phase 2 val accuracy | **86.4%** |
+| Phase 2 val accuracy | 86.4% |
+| Val split | 80/20 random split — no separate held-out test set |
 | Model size | 5.9 MB (.mlpackage) |
 | Inference speed | < 50ms (Neural Engine, iPhone 17) |
 | Confidence threshold | 40% |
@@ -129,7 +128,7 @@ Built by merging two Kaggle datasets and deduplicating via MD5 hash:
 |---|---|---|
 | iamsouravbanerjee/indian-food-images-dataset | 80 | ~4,000 |
 | ps2004/food-dataset | 30 | ~6,000 |
-| **Merged + deduped** | **30** | **5,191** |
+| Merged + deduped | 30 | 5,191 |
 
 Corrupt images filtered using PIL validation. 9 classes have only 50 images (DS1-only) — their weaker accuracy is visible in the confusion matrix diagonal.
 
@@ -141,7 +140,8 @@ Corrupt images filtered using PIL validation. 9 classes have only 50 images (DS1
 - **PIL-based pipeline** — `tf.py_function` wrapping PIL instead of `tf.image.decode_jpeg` handles corrupt/misformatted images in the merged dataset without crashing the pipeline. A filter step drops zero-valued images that failed to load.
 - **SavedModel intermediate** — coremltools 7.2 cannot introspect `.keras` format on TF 2.16+ due to a missing `_get_save_spec` method. Exporting to SavedModel first with a concrete `@tf.function` input signature works around this.
 - **MD5 deduplication** — prevents the same image appearing in both train and val splits across the two merged source datasets.
-- **IndianFoodDB-30 over Food-101** — Food-101 is a Western restaurant dataset. Samosas and biryani in it look like restaurant plating, not home cooking. A model trained on it would fail on real Indian household food.
+- **No separate test split** — 86.4% is validation accuracy on an 80/20 random split of 5,191 images. A dedicated test split would require more data per class than the current 50-image minimum.
+- **IndianFoodDB-30 over Food-101** — Food-101 is a Western restaurant dataset. Samosas and biryani in it look like restaurant plating, not home cooking. A model trained on it fails on real Indian household food.
 
 ---
 
@@ -149,7 +149,7 @@ Corrupt images filtered using PIL validation. 9 classes have only 50 images (DS1
 
 - **Idempotent camera session** — `sessionConfigured` flag prevents `AVCaptureSession` from being reconfigured on repeated view appear/disappear cycles when the user backgrounds the app.
 - **Frame throttling** — inference runs every 10th frame (~6/sec at 60fps). Balances responsiveness against battery drain.
-- **40% confidence threshold** — below this the detection card is hidden. 40% is well above the 3.3% random baseline for 30 classes; lower values caused noisy detections in real use.
+- **40% confidence threshold** — chosen empirically. Above 40%, noise dropped sharply in real use. Below 40%, false positives on non-food frames were frequent. Would tune against a proper false-positive labelled set for production.
 - **centerCrop** — `VNCoreMLRequest.imageCropAndScaleOption = .centerCrop` matches the preprocessing used during training.
 - **`#if DEBUG` logging** — all inference `print()` calls are compile-time stripped in release builds to eliminate logging overhead.
 - **Portrait lock** — `videoRotationAngle = 90` applied to the video connection so portrait camera output reaches the model in the correct orientation.
@@ -198,9 +198,9 @@ NutriLens/
 - **30 classes only** — foods outside this set are misclassified silently
 - **Visually similar dishes** — orange gravies (Paneer Butter Masala, Butter Chicken, Chana Masala) and white milk-based sweets (Ras Malai, Rasgulla, Kheer) are the weakest clusters in the confusion matrix
 - **Nutrition values are approximate** — per-100g averages vary significantly by recipe, cook, and region
-- **No persistence** — scan history resets when the app is closed (in-memory only)
+- **Scan history is session-scoped** — resets when the app is closed; persistence via SwiftData planned for v3
 - **Lighting dependent** — poor lighting or extreme angles reduce detection confidence
-- **Training data skew** — 9 classes with only 50 training images have lower diagonal values in the confusion matrix vs data-rich classes
+- **Training data skew** — 9 classes with only 50 training images have lower diagonal values in the confusion matrix
 
 ---
 
@@ -223,12 +223,8 @@ NutriLens/
 ## How to Run
 
 ### Training (Kaggle)
-```bash
-# Upload train.ipynb to Kaggle
-# Add datasets: iamsouravbanerjee/indian-food-images-dataset, ps2004/food-dataset
-# Runtime: GPU T4 x2 — ~45 mins
-# Output: NutriLens_v2.keras, label_map_v2.json
-```
+
+Upload `train.ipynb` to Kaggle, add datasets `iamsouravbanerjee/indian-food-images-dataset` and `ps2004/food-dataset`, select GPU T4×2 runtime (~45 min). Outputs: `NutriLens_v2.keras`, `label_map_v2.json`.
 
 ### CoreML Conversion (Mac M-series)
 ```bash
@@ -242,7 +238,7 @@ python verify_mlpackage.py    # smoke test
 ```
 
 ### iOS App
-1. Open `iOS/NutriLens/NutriLens.xcodeproj` in Xcode 
+1. Open `iOS/NutriLens/NutriLens.xcodeproj` in Xcode
 2. Select your iPhone as target (iOS 17+ required)
 3. `Cmd+R` — grant camera permission on first launch
 
@@ -256,4 +252,6 @@ pytest ml/tests/ -v
 
 ## Author
 
-**Aditya Bhatt** 
+**Aditya Bhatt**
+
+See [CHANGELOG.md](CHANGELOG.md) for version history. MIT licensed — see [LICENSE](LICENSE).
