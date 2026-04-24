@@ -1,24 +1,23 @@
-# macOS
+# ── macOS ─────────────────────────────────────────────────────
 .DS_Store
 **/.DS_Store
 
-# Python
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.egg-info/
 .env
 .venv/
-
-# Keras model weights
-ml/*.keras
-
-# Xcode
-iOS/NutriLens/DerivedData/
-iOS/NutriLens/NutriLens.xcodeproj/xcuserdata/
-iOS/NutriLens/NutriLens.xcodeproj/project.xcworkspace/xcuserdata/
-*.xcuserstate
-
-# Jupyter
 .ipynb_checkpoints/
-ml/NutriLens_model.keras
-ml/NutriLens_v2.keras
+
+# ── ML artifacts (large binary files) ────────────────────────
+ml/*.keras
+ml/*.h5
+ml/checkpoints/
+
+# ── Xcode ─────────────────────────────────────────────────────
+*.xcuserstate
+**/xcuserdata/
+**/DerivedData/
+*.xccheckout
+*.xcscmblueprint

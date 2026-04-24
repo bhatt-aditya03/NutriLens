@@ -1,0 +1,10 @@
+# For training on Kaggle (Linux, T4 GPU)
+
+# Usage: pip install -r requirements-train.txt
+ 
+tensorflow==2.19.0
+scikit-learn==1.4.2
+matplotlib==3.8.4
+seaborn==0.13.2
+Pillow==10.4.0
+numpy==1.26.4

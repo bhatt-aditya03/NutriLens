@@ -1,0 +1,45 @@
+# .github/workflows/ml.yml
+# CI — runs on every push to main
+# Verifies label map integrity and CoreML model structure
+
+name: ML Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ml/**'
+      - '.github/workflows/ml.yml'
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest numpy Pillow
+
+      - name: Run ML tests
+        run: |
+          pytest ml/tests/ -v --tb=short
+
+      - name: Verify label map
+        run: |
+          python -c "
+          import json
+          lm = json.load(open('ml/label_map_v2.json'))
+          assert len(lm['target_classes']) == 30
+          print(f'Label map OK — {len(lm[\"target_classes\"])} classes')
+          print(f'Accuracy: {lm[\"model_info\"][\"val_accuracy\"]*100:.1f}%')
+          "

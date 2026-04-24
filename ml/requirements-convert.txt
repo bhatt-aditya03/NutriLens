@@ -1,0 +1,8 @@
+# For CoreML conversion on Apple Silicon Mac (M1/M2/M3/M4/M5)
+
+# Usage: pip install -r requirements-convert.txt
+ 
+tensorflow-macos==2.16.2
+coremltools==7.2
+Pillow==10.4.0
+numpy==1.26.4
