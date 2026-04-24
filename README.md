@@ -1,8 +1,6 @@
 # NutriLens 🔍🍽️
 
-> **Real-time on-device Indian food classification iOS app**  
-> Point your camera at food — get instant nutrition estimates. No internet required.
-
+![ML Tests](https://github.com/bhatt-aditya03/NutriLens/actions/workflows/ml.yml/badge.svg)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange?logo=swift&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.19-FF6F00?logo=tensorflow&logoColor=white)
@@ -10,9 +8,14 @@
 ![iOS](https://img.shields.io/badge/iOS-17%2B-lightgrey?logo=apple&logoColor=white)
 ![Accuracy](https://img.shields.io/badge/Accuracy-86.4%25-brightgreen)
 ![Classes](https://img.shields.io/badge/Classes-30-blue)
-![Model Size](https://img.shields.io/badge/Model-5.9MB-blue)
-![Dataset](https://img.shields.io/badge/Dataset-IndianFoodDB--30-orange)
+![Model](https://img.shields.io/badge/Model-5.9MB-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+
+Real-time on-device Indian food classification iOS app. Point your camera at food — get instant nutrition estimates. No internet required.
+
+**iOS App:** See `/iOS` — SwiftUI + CoreML, runs on iOS 17+
+
+> **Disclaimer:** Nutrition values are approximate per-100g averages sourced from IFCT 2017 and USDA FoodData Central. Values vary by recipe and preparation. Not intended for medical or clinical dietary use.
 
 ---
 
@@ -24,43 +27,43 @@
 
 ---
 
-## What it does
-
-NutriLens uses a custom-trained **MobileNetV2 CNN** trained on **IndianFoodDB-30** — a curated dataset of 30 Indian food classes — to classify food in real time via the iPhone camera. Built specifically for Indian home cooking, street food, and everyday meals.
-
-**Live detection shows:**
-- Food name with confidence score
-- Protein / Calories / Fat / Carbs per serving
-- Serving size slider — scale from 50g to 500g live
-- Scan history with daily protein and calorie totals
-- Tap anywhere to freeze frame and adjust serving size
-
-**Everything runs on-device** — no API calls, no latency, no data leaving your phone.
-
----
-
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     NutriLens App                        │
-├──────────────────┬──────────────────────────────────────┤
-│   Training (ML)  │           iOS App (Swift)             │
-│                  │                                       │
-│  IndianFoodDB-30 │  AVFoundation → live camera frames    │
-│  (5,191 images)  │         ↓                             │
-│     ↓            │  Vision Framework → VNCoreMLRequest   │
-│  MobileNetV2     │         ↓                             │
-│  fine-tuned      │  CoreML → NutriLens_v2.mlpackage      │
-│  (TensorFlow)    │         ↓                             │
-│     ↓            │  SwiftUI → nutrition card overlay     │
-│  coremltools     │         ↓                             │
-│  conversion      │  ScanHistory → daily totals           │
-│     ↓            │                                       │
-│  .mlpackage      │                                       │
-│  (5.9 MB)        │                                       │
-└──────────────────┴──────────────────────────────────────┘
+iPhone Camera (AVFoundation)
+        ↓
+CameraPreview — AVCaptureVideoPreviewLayer
+        ↓  CVPixelBuffer @ ~6 fps (1 in 10 frames)
+Vision Framework — VNCoreMLRequest (centerCrop)
+        ↓
+CoreML — NutriLens_v2.mlpackage (Neural Engine)
+        ↓
+{ label: "Biryani", confidence: 0.94 }
+        ↓
+FoodClassifier (ObservableObject) → SwiftUI overlay
+        ↓
+DetectionCard — nutrition scaled by serving size slider
+        ↓
+ScanHistoryStore — daily protein + calorie totals
 ```
+
+---
+
+## Model
+
+| Property | Value |
+|---|---|
+| Architecture | MobileNetV2 (ImageNet pretrained) |
+| Training strategy | Two-phase: head only → top-layer fine-tuning |
+| Dataset | IndianFoodDB-30 (5,191 images, 30 classes) |
+| Training platform | Kaggle T4 x2 GPU |
+| Phase 1 val accuracy | 84.0% |
+| Phase 2 val accuracy | **86.4%** |
+| Model size | 5.9 MB (.mlpackage) |
+| Inference speed | < 50ms (Neural Engine, iPhone 17) |
+| Confidence threshold | 40% |
+
+**Nutrition scaling:** `displayed_value = base_per_100g × (serving_grams / 100)`. All values are linearly scaled from the per-100g baseline in `label_map_v2.json`. Actual nutrition varies non-linearly with preparation — this is an intentional approximation for demo clarity.
 
 ---
 
@@ -74,36 +77,8 @@ NutriLens uses a custom-trained **MobileNetV2 CNN** trained on **IndianFoodDB-30
 | iOS camera | AVFoundation | AVCaptureSession, live frames |
 | iOS inference | Vision framework | VNCoreMLRequest, centerCrop |
 | iOS UI | SwiftUI | Live overlay, serving size slider, history |
-| On-device storage | In-memory | Scan history, daily totals |
+| CI | GitHub Actions | pytest, 7 tests on every push to ml/ |
 | Deployment | CoreML, Neural Engine | Runs fully offline on iPhone |
-
----
-
-## Model Performance
-
-| Metric | Value |
-|---|---|
-| Architecture | MobileNetV2 (ImageNet pretrained, fine-tuned) |
-| Training strategy | Two-phase: head only → top-layer fine-tuning |
-| Dataset | IndianFoodDB-30 (5,191 images, 30 classes) |
-| Training platform | Kaggle T4 x2 GPU |
-| Phase 1 best accuracy | 84.0% |
-| Phase 2 best accuracy | **86.4%** |
-| Model size | 5.9 MB (.mlpackage) |
-| Inference speed | < 50ms on iPhone (Neural Engine) |
-| Confidence threshold | 40% |
-
----
-
-## Technical Decisions
-
-**Why MobileNetV2?** Designed for mobile inference — strikes the right balance between accuracy and model size. At 5.9MB it fits comfortably on-device while running in real time via the Neural Engine. Heavier architectures (ResNet, EfficientNet-B4) gave marginal accuracy gains but were 4-8x larger and noticeably slower on iPhone.
-
-**Why two-phase training?** Freezing the base in Phase 1 lets the randomly-initialised classification head converge first without corrupting ImageNet features. Phase 2 then fine-tunes the top layers of the base at a 20x lower learning rate. This gave +2.4% accuracy over single-phase training.
-
-**Why 40% confidence threshold?** Below 40%, the model is essentially guessing — detections became noisy and distracting in real use. 40% was the empirical sweet spot: high enough to suppress false positives, low enough not to miss confident-but-not-perfect detections on home-cooked food.
-
-**Why IndianFoodDB-30 over Food-101?** Food-101 is a Western restaurant dataset — samosas and biryani in it look like restaurant plating, not home cooking. A model trained on it would fail on real Indian household food. Building IndianFoodDB-30 by merging two India-specific Kaggle datasets gave the model exposure to home-style presentation.
 
 ---
 
@@ -142,13 +117,13 @@ NutriLens uses a custom-trained **MobileNetV2 CNN** trained on **IndianFoodDB-30
 | 29 | Kadai Paneer | 11.0g | 175 kcal |
 | 30 | Rajma | 9.0g | 144 kcal |
 
-Nutrition values are approximate per-100g averages sourced from the Indian Food Composition Tables (IFCT 2017) and USDA FoodData Central.
+Values from IFCT 2017 and USDA FoodData Central, averaged across common preparations.
 
 ---
 
 ## Dataset — IndianFoodDB-30
 
-Built by merging two Kaggle datasets:
+Built by merging two Kaggle datasets and deduplicating via MD5 hash:
 
 | Source | Classes | Images |
 |---|---|---|
@@ -156,18 +131,28 @@ Built by merging two Kaggle datasets:
 | ps2004/food-dataset | 30 | ~6,000 |
 | **Merged + deduped** | **30** | **5,191** |
 
-Deduplication via MD5 hash. Corrupt images filtered using PIL validation.
+Corrupt images filtered using PIL validation. 9 classes have only 50 images (DS1-only) — their weaker accuracy is visible in the confusion matrix diagonal.
 
 ---
 
-## Limitations
+## ML Engineering Notes
 
-- **30 classes only** — foods outside these classes will be misclassified or ignored
-- **Visually similar dishes** — the model struggles to distinguish between dishes with similar appearance: Palak Paneer vs Dal Makhani (dark green/brown gravies), Paneer Butter Masala vs Butter Chicken (orange gravies), Ras Malai vs Rasgulla (white syrup-soaked sweets). This is visible in the confusion matrix
-- **Nutrition values are approximate** — values are per-100g averages and vary significantly by recipe, cook, and region
-- **Lighting dependent** — poor lighting or extreme angles reduce detection confidence
-- **Training data bias** — IndianFoodDB-30 skews toward restaurant-style plating for some classes; home-cooked presentation may differ
-- **Low image count for some classes** — 9 classes had only 50 training images (from DS1 only), making them weaker than classes with 200-300 images
+- **Two-phase training** — base frozen in Phase 1 so the randomly-initialised head converges without corrupting ImageNet features. Phase 2 unfreezes top 54 layers at 20× lower LR (5e-5). This gave +2.4% over single-phase training.
+- **PIL-based pipeline** — `tf.py_function` wrapping PIL instead of `tf.image.decode_jpeg` handles corrupt/misformatted images in the merged dataset without crashing the pipeline. A filter step drops zero-valued images that failed to load.
+- **SavedModel intermediate** — coremltools 7.2 cannot introspect `.keras` format on TF 2.16+ due to a missing `_get_save_spec` method. Exporting to SavedModel first with a concrete `@tf.function` input signature works around this.
+- **MD5 deduplication** — prevents the same image appearing in both train and val splits across the two merged source datasets.
+- **IndianFoodDB-30 over Food-101** — Food-101 is a Western restaurant dataset. Samosas and biryani in it look like restaurant plating, not home cooking. A model trained on it would fail on real Indian household food.
+
+---
+
+## iOS Engineering Notes
+
+- **Idempotent camera session** — `sessionConfigured` flag prevents `AVCaptureSession` from being reconfigured on repeated view appear/disappear cycles when the user backgrounds the app.
+- **Frame throttling** — inference runs every 10th frame (~6/sec at 60fps). Balances responsiveness against battery drain.
+- **40% confidence threshold** — below this the detection card is hidden. 40% is well above the 3.3% random baseline for 30 classes; lower values caused noisy detections in real use.
+- **centerCrop** — `VNCoreMLRequest.imageCropAndScaleOption = .centerCrop` matches the preprocessing used during training.
+- **`#if DEBUG` logging** — all inference `print()` calls are compile-time stripped in release builds to eliminate logging overhead.
+- **Portrait lock** — `videoRotationAngle = 90` applied to the video connection so portrait camera output reaches the model in the correct orientation.
 
 ---
 
@@ -175,29 +160,47 @@ Deduplication via MD5 hash. Corrupt images filtered using PIL validation.
 
 ```
 NutriLens/
+├── .github/
+│   └── workflows/
+│       └── ml.yml                   # GitHub Actions — pytest on every push to ml/
 ├── ml/
-│   ├── train.ipynb                  # MobileNetV2 training (Kaggle)
-│   ├── convert_to_coreml.py         # Keras → CoreML conversion
-│   ├── verify_mlpackage.py          # Model verification script
-│   ├── label_map_v2.json            # Class labels + model metadata
-│   ├── requirements.txt             # Python dependencies
+│   ├── tests/
+│   │   └── test_conversion.py       # 7 smoke tests (label map + CoreML structure)
+│   ├── train.ipynb                  # MobileNetV2 training — Kaggle T4 x2
+│   ├── convert_to_coreml.py         # Keras → SavedModel → .mlpackage
+│   ├── verify_mlpackage.py          # Post-conversion verification script
+│   ├── label_map_v2.json            # Class labels, display names, model metadata
+│   ├── requirements-train.txt       # Kaggle training environment (Linux, T4)
+│   ├── requirements-convert.txt     # CoreML conversion environment (Mac M-series)
 │   └── NutriLens_v2.mlpackage/      # CoreML model (5.9MB)
 ├── iOS/
 │   └── NutriLens/
 │       └── NutriLens/
 │           ├── FoodClassifier.swift     # AVFoundation + Vision + CoreML
-│           ├── CameraView.swift         # SwiftUI camera overlay
-│           ├── CameraPreview.swift      # AVCaptureVideoPreviewLayer
+│           ├── CameraView.swift         # SwiftUI overlay + detection card
+│           ├── CameraPreview.swift      # UIViewRepresentable — preview layer
 │           ├── HistoryView.swift        # Scan history screen
-│           ├── ScanHistory.swift        # History data model
+│           ├── ScanHistory.swift        # ScanEntry + ScanHistoryStore
 │           └── ContentView.swift        # Entry point
 ├── assets/
-│   ├── NutriLens.gif            # Demo recording
-│   ├── training_curves.png      # Loss + accuracy curves
-│   └── confusion_matrix.png     # Per-class accuracy heatmap
+│   ├── NutriLens.gif                # Full feature demo (1 min)
+│   ├── training_curves.png          # Phase 1 + Phase 2 accuracy/loss
+│   └── confusion_matrix.png         # Per-class accuracy heatmap
+├── CHANGELOG.md
 ├── LICENSE
 └── README.md
 ```
+
+---
+
+## Limitations
+
+- **30 classes only** — foods outside this set are misclassified silently
+- **Visually similar dishes** — orange gravies (Paneer Butter Masala, Butter Chicken, Chana Masala) and white milk-based sweets (Ras Malai, Rasgulla, Kheer) are the weakest clusters in the confusion matrix
+- **Nutrition values are approximate** — per-100g averages vary significantly by recipe, cook, and region
+- **No persistence** — scan history resets when the app is closed (in-memory only)
+- **Lighting dependent** — poor lighting or extreme angles reduce detection confidence
+- **Training data skew** — 9 classes with only 50 training images have lower diagonal values in the confusion matrix vs data-rich classes
 
 ---
 
@@ -217,28 +220,40 @@ NutriLens/
 
 ---
 
-## How to run
+## How to Run
 
-### ML (training + conversion)
+### Training (Kaggle)
+```bash
+# Upload train.ipynb to Kaggle
+# Add datasets: iamsouravbanerjee/indian-food-images-dataset, ps2004/food-dataset
+# Runtime: GPU T4 x2 — ~45 mins
+# Output: NutriLens_v2.keras, label_map_v2.json
+```
+
+### CoreML Conversion (Mac M-series)
 ```bash
 cd ml/
 conda create -n coreml_env python=3.10 -y
 conda activate coreml_env
-pip install -r requirements.txt
+pip install -r requirements-convert.txt
 
-python convert_to_coreml.py
-python verify_mlpackage.py
+python convert_to_coreml.py   # outputs NutriLens_v2.mlpackage
+python verify_mlpackage.py    # smoke test
 ```
 
-### iOS app
-1. Open `iOS/NutriLens/NutriLens.xcodeproj` in Xcode 16
-2. Select your iPhone as target
-3. `Cmd+R` to build and run
-4. Grant camera permission on first launch
+### iOS App
+1. Open `iOS/NutriLens/NutriLens.xcodeproj` in Xcode 
+2. Select your iPhone as target (iOS 17+ required)
+3. `Cmd+R` — grant camera permission on first launch
+
+### Tests
+```bash
+pip install pytest numpy Pillow
+pytest ml/tests/ -v
+```
 
 ---
 
 ## Author
 
-**Aditya Bhatt** — B.Tech CSE (Data Science), PSIT Kanpur  
-[github.com/bhatt-aditya03](https://github.com/bhatt-aditya03) · [linkedin.com/in/bhatt-aditya03](https://linkedin.com/in/bhatt-aditya03)
+**Aditya Bhatt** 
